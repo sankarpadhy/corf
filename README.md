@@ -8,6 +8,7 @@
 5. [Testing and Validation](#testing-and-validation)
 6. [Best Practices](#best-practices)
 7. [Additional Resources](#additional-resources)
+8. [Setup and Running Instructions](#setup-and-running-instructions)
 
 ## Understanding CORS
 
@@ -419,10 +420,68 @@ public class BankingController {
 - [MDN CORS Guide](https://developer.mozilla.org/en-US/docs/Web/HTTP/CORS)
 - [OWASP CORS Guidelines](https://owasp.org/www-project-web-security-testing-guide/latest/4-Web_Application_Security_Testing/11-Client_Side_Testing/07-Testing_Cross_Origin_Resource_Sharing)
 
+## Setup and Running Instructions
+
+### Prerequisites
+
+- Java 17
+- Maven
+- Node.js (for running frontend servers)
+- Git
+
+### Quick Start
+
+1. **Clone the Repository**
+   ```bash
+   git clone https://github.com/sankarpadhy/cors-protection.git
+   cd cors-protection
+   ```
+
+2. **Start the Backend Server**
+   ```bash
+   # Using Maven
+   mvn spring-boot:run
+
+   # The backend will start on http://localhost:8080
+   ```
+
+3. **Start the Frontend Applications**
+   ```bash
+   # On Windows, use the batch file
+   start-frontend.bat
+
+   # Or start manually using npm
+   npm run start:mobile    # Starts Mobile Banking on http://localhost:3000
+   npm run start:planner   # Starts Financial Planner on http://localhost:3001
+   npm run start:invest    # Starts Investment Dashboard on http://localhost:3002
+   ```
+
+### Accessing the Applications
+
+After starting the servers, you can access the applications at:
+
+- Mobile Banking App: [http://localhost:3000](http://localhost:3000)
+- Financial Planner: [http://localhost:3001](http://localhost:3001)
+- Investment Dashboard: [http://localhost:3002](http://localhost:3002)
+
+### Running Tests
+
+To test the CORS functionality:
+
+```bash
+# Run the test script
+sh test-cors.sh
+```
+
 ## Support
 Need help? Check out:
 - GitHub Issues
 - Stack Overflow with tag [spring-cors]
 - Spring Security Forum
+
+## Access the Code
+
+You can access the complete code for this project on GitHub:
+[GitHub Repository](https://github.com/sankarpadhy/cors-protection)
 
 Remember: CORS is a critical security feature for banking applications. Always test thoroughly and follow security best practices.
