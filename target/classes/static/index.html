@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CORS Protection Demo</title>
+    <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+    <div class="container">
+        <h1>CORS Protection Demo</h1>
+        
+        <div class="api-section">
+            <h2>Authentication</h2>
+            <div class="form-group">
+                <label for="token">Bearer Token:</label>
+                <input type="text" id="token" placeholder="Enter your bearer token" style="width: 100%; padding: 8px; margin: 8px 0;">
+            </div>
+        </div>
+
+        <div class="api-section">
+            <h2>Public Endpoint</h2>
+            <button id="fetchPublic" class="button">Fetch Public Data</button>
+            <div id="publicResponse"></div>
+        </div>
+
+        <div class="api-section">
+            <h2>Protected Endpoint</h2>
+            <button id="fetchProtected" class="button">Fetch Protected Data</button>
+            <div id="protectedResponse"></div>
+        </div>
+
+        <div class="api-section">
+            <h2>Update Data (Protected)</h2>
+            <button id="updateData" class="button">Update Data</button>
+            <div id="updateResponse"></div>
+        </div>
+    </div>
+
+    <script src="js/main.js"></script>
+</body>
+</html>

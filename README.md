@@ -1,76 +1,185 @@
-# CORS Configuration Demo
+# CORS Protection Guide
+
+## 📚 Table of Contents
+1. [Understanding CORS](#understanding-cors)
+2. [Learning Objectives](#learning-objectives)
+3. [CORS in Action](#cors-in-action)
+4. [Implementation Guide](#implementation-guide)
+5. [Testing and Validation](#testing-and-validation)
+6. [Best Practices](#best-practices)
+7. [Additional Resources](#additional-resources)
+
+## Understanding CORS
+
+### What is CORS?
+Cross-Origin Resource Sharing (CORS) is a security feature implemented in web browsers to control how web pages can request resources from a different domain than the one that served the web page. It uses HTTP headers to tell browsers whether a specific web app can share resources with another web app from a different origin.
+
+### The House Security Analogy 🏠
+
+Think of CORS like a security system for your house:
+
+```mermaid
+graph TD
+    A[Banking System] -->|like| B[House Security]
+    B --> C[Locks/CSRF]
+    B --> D[Fences/CORS]
+    C --> E[Prevent unauthorized entry]
+    D --> F[Control who can approach]
+    style A fill:#f9f,stroke:#333,color:#000000
+    style B fill:#bbf,stroke:#333,color:#000000
+    style C fill:#fff,stroke:#333,color:#000000
+    style D fill:#fff,stroke:#333,color:#000000
+    style E fill:#fff,stroke:#333,color:#000000
+    style F fill:#fff,stroke:#333,color:#000000
+```
+
+### CORS vs. CSRF
+While both deal with cross-origin security:
+- **CORS**: Acts like a fence, controlling which external applications can access your banking API
+- **CSRF**: Acts like a lock, preventing unauthorized transactions using your banking credentials
+
+### Real-World Example: Modern Banking
+
+Imagine a banking system (`mybank.com`) that provides financial services:
+
+1. **Trusted Partners**:
+   - Mobile Banking App (`mybank-mobile.com`)
+   - Financial Planning App (`mybank-planner.com`)
+   - Investment Dashboard (`mybank-invest.com`)
+
+2. **Security Needs**:
+   - Allow access from trusted partner applications
+   - Block unauthorized access from unknown sources
+   - Protect sensitive financial data
+   - Enable secure transactions
+
+### Key Concepts
+- **Origin**: Protocol + Domain + Port (e.g., `https://mybank.com:443`)
+- **Same-Origin**: Requests within the same banking domain are always allowed
+- **Cross-Origin**: Requests from partner applications need explicit permission
 
 ## Learning Objectives
-By the end of this tutorial, you will:
+By completing this guide, you will:
 1. Understand CORS and its importance in web security
 2. Learn how to implement CORS in Spring Boot applications
 3. Master best practices for cross-origin security
-4. Build a secure API with proper CORS configuration
+4. Build a secure banking API with proper CORS configuration
 
-## Project Structure
-```
-cors-protection/
-├── src/
-│   ├── main/
-│   │   ├── java/
-│   │   │   └── com/
-│   │   │       └── example/
-│   │   │           └── cors/
-│   │   │               ├── CorsProtectionApplication.java
-│   │   │               ├── config/
-│   │   │               │   └── SecurityConfig.java
-│   │   │               ├── controller/
-│   │   │               │   ├── ResourceController.java
-│   │   │               │   └── AuthController.java
-│   │   │               ├── model/
-│   │   │               │   └── ApiResponse.java
-│   │   │               └── service/
-│   │   │                   └── ResourceService.java
-│   │   └── resources/
-│   │       ├── static/
-│   │       │   ├── css/
-│   │       │   │   └── styles.css
-│   │       │   └── js/
-│   │       │       └── main.js
-│   │       └── application.properties
-│   └── test/
-│       └── java/
-│           └── com/
-│               └── example/
-│                   └── cors/
-│                       └── CorsProtectionTests.java
-├── pom.xml
-└── README.md
-```
+## CORS in Action
 
-## Architecture Overview
-
+### Architecture Overview
 ```mermaid
 graph TB
-    subgraph "Client Applications"
-        R[React App<br/>localhost:3000]
-        V[Vue App<br/>localhost:8081]
+    subgraph "Banking Applications"
+        M[Mobile App<br/>mybank-mobile.com]
+        P[Planner App<br/>mybank-planner.com]
+        I[Investment App<br/>mybank-invest.com]
     end
     
-    subgraph "API Server"
+    subgraph "Banking API Server"
         CF[CORS Filter]
         SC[Security Config]
-        API[API Controllers]
+        API[Banking API]
     end
     
-    R -->|Cross-Origin Request| CF
-    V -->|Cross-Origin Request| CF
+    M -->|Cross-Origin Request| CF
+    P -->|Cross-Origin Request| CF
+    I -->|Cross-Origin Request| CF
     CF -->|Check Origin| SC
     SC -->|If Allowed| API
 
-    style R fill:#61dafb,stroke:#333
-    style V fill:#42b883,stroke:#333
+    style M fill:#61dafb,stroke:#333
+    style P fill:#42b883,stroke:#333
+    style I fill:#ffd700,stroke:#333
     style CF fill:#ff6b6b,stroke:#333
 ```
 
+### Request Flow Examples
+
+Let's examine how CORS handles different types of origins in a banking context:
+
+#### Scenario 1: Same-Origin Request (No CORS Needed)
+When a customer uses the main banking portal to check their balance:
+
+```mermaid
+sequenceDiagram
+    participant MB as Main Banking Portal<br/>(mybank.com)
+    participant B as Browser
+    participant API as Banking API<br/>(mybank.com/api)
+    
+    Note over MB,API: Same-Origin Request (mybank.com → mybank.com/api)
+    MB->>B: User clicks "Check Balance"
+    B->>API: GET /api/banking/balance<br/>Origin: https://mybank.com
+    Note over API: No CORS check needed<br/>Same origin: mybank.com
+    API->>B: 200 OK<br/>Balance: $1,000
+    B->>MB: Display balance to user
+```
+
+#### Scenario 2: Cross-Origin Request (CORS Required)
+When a partner application needs to access banking data:
+
+```mermaid
+sequenceDiagram
+    participant FP as Partner App<br/>(mybank-partner.com:443)
+    participant B as Browser
+    participant API as Banking API<br/>(mybank.com:443)
+    
+    Note over FP,API: Cross-Origin Request<br/>Different origin: Protocol + Domain + Port don't match
+    FP->>B: User initiates transfer
+    
+    Note over B,API: Step 1: Preflight (OPTIONS)
+    B->>API: OPTIONS /api/banking/transfer<br/>Origin: https://mybank-partner.com:443<br/>Access-Control-Request-Method: POST
+    Note over API: CORS Check:<br/>1. Origin validation<br/>2. Method allowed?<br/>3. Headers allowed?
+    API->>B: 200 OK<br/>Access-Control-Allow-Origin: https://mybank-partner.com:443<br/>Access-Control-Allow-Methods: POST, GET
+    
+    Note over B,API: Step 2: Actual Request
+    B->>API: POST /api/banking/transfer<br/>Origin: https://mybank-partner.com:443
+    API->>B: 200 OK<br/>Access-Control-Allow-Origin: https://mybank-partner.com:443
+    B->>FP: Show success message
+```
+
+### Headers Flow Explained
+
+This diagram shows how CORS validates different origins:
+
+```mermaid
+graph TB
+    subgraph "1.Origin Analysis"
+        SO[Same Origin:<br/>  https:// mybank.com:443<br/>↓<br/> https:// mybank.com:443/api]
+        CO[Cross Origin:<br/> https:// mybank-partner.com:443<br/>↓<br/> https:// mybank.com:443]
+    end
+
+    subgraph "2.CORS Security Check"
+        CP[CORS Policy Validation]
+        VC[Validation Rules:<br/>1.Protocol-https<br/>2.Domain-mybank.com<br/>3.Port:443]
+    end
+
+    subgraph "3.Response Headers"
+        AO[Access-Control-Allow-Origin:<br/>Specific origin or *]
+        AM[Access-Control-Allow-Methods:<br/>Allowed HTTP methods]
+        AC[Access-Control-Allow-Credentials:<br/>Cookie handling]
+    end
+
+    SO --No CORS Required-->CP
+    CO --Requires CORS Check-->CP
+    CP --If Origin Matches-->AO
+    CP --If Methods Allowed-->AM
+    CP --If Credentials Needed-->AC
+
+    style SO fill:#bfb,stroke:#333
+    style CO fill:#f9f,stroke:#333
+    style CP fill:#bbf,stroke:#333
+```
+
+This flow demonstrates:
+1. **Same-Origin**: Requests within `mybank.com` domain are automatically allowed
+2. **Cross-Origin**: Partner applications need explicit CORS permission
+3. **Origin Components**: How protocol (https), domain (mybank.com), and port (443) affect CORS policy
+4. **Security Checks**: Different validation steps for cross-origin requests
+
 ## Implementation Guide
 
-### Step 1: Configure CORS in Spring Security
+### Backend Configuration
 
 ```java
 @Configuration
@@ -83,7 +192,7 @@ public class SecurityConfig {
                 .configurationSource(corsConfigurationSource()))
             .csrf(csrf -> csrf.disable())
             .authorizeHttpRequests(auth -> auth
-                .requestMatchers("/api/public/**").permitAll()
+                .antMatchers("/api/banking/balance", "/api/banking/transfer").permitAll()
                 .anyRequest().authenticated()
             );
         return http.build();
@@ -92,199 +201,218 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-        
-        // Allow specific origins
         configuration.setAllowedOrigins(Arrays.asList(
             "http://localhost:3000",
-            "http://localhost:8081"
+            "http://localhost:3001",
+            "http://localhost:3002"
         ));
-        
-        // Allow specific methods
-        configuration.setAllowedMethods(Arrays.asList(
-            "GET", "POST", "PUT", "DELETE", "OPTIONS"
-        ));
-        
-        // Allow specific headers
-        configuration.setAllowedHeaders(Arrays.asList(
-            "Authorization",
-            "Content-Type",
-            "X-Requested-With"
-        ));
-        
-        // Allow credentials (cookies, authorization headers)
+        configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS"));
+        configuration.setAllowedHeaders(Arrays.asList("Authorization", "Content-Type", "X-Requested-With"));
         configuration.setAllowCredentials(true);
         
-        // Cache preflight response for 3600 seconds
-        configuration.setMaxAge(3600L);
-
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
-        source.registerCorsConfiguration("/api/**", configuration);
-        
+        source.registerCorsConfiguration("/**", configuration);
         return source;
     }
 }
 ```
 
-### Step 2: Create Protected Resources
+### API Implementation
 
 ```java
 @RestController
-@RequestMapping("/api")
-public class ResourceController {
-    
-    @GetMapping("/public/data")
-    public ResponseEntity<?> getPublicData() {
-        return ResponseEntity.ok(
-            new ApiResponse("success", "Public data accessed")
-        );
+@RequestMapping("/api/banking")
+public class BankingController {
+    /**
+     * Get Account Balance
+     * 
+     * Same-Origin Flow:
+     * mybank.com ───▶ api.mybank.com/balance
+     *   (No CORS check needed)
+     * 
+     * Cross-Origin Flow:
+     * partner.com ──[CORS]──▶ api.mybank.com/balance
+     */
+    @GetMapping("/balance")
+    public ResponseEntity<?> getBalance() {
+        // Simulate balance check
+        return ResponseEntity.ok(new ApiResponse("success", "Balance: ₹10,000"));
     }
     
-    @GetMapping("/protected/data")
-    public ResponseEntity<?> getProtectedData() {
-        return ResponseEntity.ok(
-            new ApiResponse("success", "Protected data accessed")
-        );
+    /**
+     * Transfer Funds
+     * 
+     * Preflight Flow:
+     * 1. OPTIONS request
+     *    partner.com ──[CORS]──▶ api.mybank.com/transfer
+     * 2. Actual POST
+     *    partner.com ──[CORS]──▶ api.mybank.com/transfer
+     */
+    @PostMapping("/transfer")
+    public ResponseEntity<?> makeTransfer(@RequestBody TransferRequest request) {
+        // Simulate transfer
+        return ResponseEntity.ok(new ApiResponse("success", 
+            String.format("Transferred ₹%d to account", request.getAmount())));
     }
-    
-    @PostMapping("/protected/update")
-    public ResponseEntity<?> updateData(@RequestBody UpdateRequest request) {
-        // Process update
-        return ResponseEntity.ok(
-            new ApiResponse("success", "Data updated successfully")
-        );
+
+    /**
+     * Handle OPTIONS requests explicitly
+     * Required for CORS preflight requests
+     */
+    @RequestMapping(method = RequestMethod.OPTIONS)
+    public ResponseEntity<?> handleOptions() {
+        return ResponseEntity.ok().build();
     }
 }
 ```
 
-### Step 3: Frontend Implementation
+### Frontend Implementation
 
-```javascript
-// React/Vue client implementation
-class ApiClient {
-    static async fetchPublicData() {
-        const response = await fetch('http://localhost:8080/api/public/data', {
-            method: 'GET',
-            credentials: 'include', // Important for CORS with credentials
-            headers: {
-                'Content-Type': 'application/json'
-            }
-        });
-        return response.json();
-    }
-    
-    static async fetchProtectedData(token) {
-        const response = await fetch('http://localhost:8080/api/protected/data', {
-            method: 'GET',
-            credentials: 'include',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${token}`
-            }
-        });
-        return response.json();
-    }
-    
-    static async updateData(token, data) {
-        const response = await fetch('http://localhost:8080/api/protected/update', {
-            method: 'POST',
-            credentials: 'include',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${token}`
-            },
-            body: JSON.stringify(data)
-        });
-        return response.json();
-    }
-}
-
-// Error handling wrapper
-async function makeApiCall(apiFunc) {
-    try {
-        const response = await apiFunc();
-        if (!response.ok) {
-            throw new Error(`API call failed: ${response.status}`);
+```html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MyBank Mobile App</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        .bank-card {
+            background: linear-gradient(45deg, #2193b0, #6dd5ed);
+            color: white;
+            border-radius: 15px;
+            padding: 20px;
+            margin: 20px 0;
         }
-        return response.json();
-    } catch (error) {
-        console.error('API Error:', error);
-        throw error;
-    }
-}
+        .balance-amount {
+            font-size: 2em;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <div class="container mt-5">
+        <div class="row">
+            <div class="col-md-8 offset-md-2">
+                <h1 class="mb-4">MyBank Mobile Banking</h1>
+                <div class="bank-card">
+                    <h3>Account Balance</h3>
+                    <div id="balanceDisplay" class="balance-amount">Loading...</div>
+                    <button onclick="checkBalance()" class="btn btn-light mt-3">Refresh Balance</button>
+                </div>
+                
+                <div class="card mt-4">
+                    <div class="card-body">
+                        <h3>Transfer Money</h3>
+                        <div class="mb-3">
+                            <label for="amount" class="form-label">Amount (₹)</label>
+                            <input type="number" class="form-control" id="amount">
+                        </div>
+                        <div class="mb-3">
+                            <label for="toAccount" class="form-label">To Account</label>
+                            <input type="text" class="form-control" id="toAccount">
+                        </div>
+                        <button onclick="transfer()" class="btn btn-primary">Transfer</button>
+                    </div>
+                </div>
+                
+                <div id="message" class="alert mt-3" style="display: none;"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:8080/api/banking';
+
+        async function checkBalance() {
+            try {
+                const response = await fetch(`${API_BASE}/balance`, {
+                    credentials: 'include'
+                });
+                const data = await response.json();
+                document.getElementById('balanceDisplay').textContent = data.message;
+                showMessage('success', 'Balance updated successfully');
+            } catch (error) {
+                showMessage('error', 'Failed to fetch balance: ' + error.message);
+            }
+        }
+
+        async function transfer() {
+            const amount = document.getElementById('amount').value;
+            const toAccount = document.getElementById('toAccount').value;
+
+            try {
+                const response = await fetch(`${API_BASE}/transfer`, {
+                    method: 'POST',
+                    credentials: 'include',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ amount, toAccount })
+                });
+                const data = await response.json();
+                showMessage('success', data.message);
+            } catch (error) {
+                showMessage('error', 'Transfer failed: ' + error.message);
+            }
+        }
+
+        function showMessage(type, text) {
+            const msgDiv = document.getElementById('message');
+            msgDiv.className = `alert alert-${type === 'success' ? 'success' : 'danger'} mt-3`;
+            msgDiv.textContent = text;
+            msgDiv.style.display = 'block';
+            setTimeout(() => msgDiv.style.display = 'none', 5000);
+        }
+
+        // Initial balance check
+        checkBalance();
+    </script>
+</body>
+</html>
 ```
 
-## Testing CORS Configuration
+## Testing and Validation
 
-1. **Using cURL**:
-```bash
-# Test preflight request
-curl -X OPTIONS \
-     -H "Origin: http://localhost:3000" \
-     -H "Access-Control-Request-Method: POST" \
-     -H "Access-Control-Request-Headers: Authorization,Content-Type" \
-     http://localhost:8080/api/protected/data -v
+### Manual Test Cases
 
-# Test actual request
-curl -X GET \
-     -H "Origin: http://localhost:3000" \
-     -H "Authorization: Bearer your-token" \
-     http://localhost:8080/api/protected/data -v
-```
+1. **Mobile Banking App Balance Check**
+   - **Request**: GET `/api/banking/balance`
+   - **Expected Outcome**: Successfully fetches balance with status "success" and message "Balance: ₹10,000".
 
-2. **Using Browser Console**:
-```javascript
-// Test public endpoint
-fetch('http://localhost:8080/api/public/data', {
-    method: 'GET',
-    credentials: 'include'
-}).then(response => response.json())
-  .then(data => console.log(data));
+2. **Financial Planner Transfer**
+   - **Preflight Request**:
+     - **Request**: OPTIONS `/api/banking/transfer`
+     - **Expected Outcome**: Successful preflight with appropriate CORS headers.
+   - **Actual Transfer Request**:
+     - **Request**: POST `/api/banking/transfer`
+     - **Expected Outcome**: Successfully transfers funds with status "success" and message "Transferred ₹5000 to account".
 
-// Test protected endpoint
-fetch('http://localhost:8080/api/protected/data', {
-    method: 'GET',
-    credentials: 'include',
-    headers: {
-        'Authorization': 'Bearer your-token'
-    }
-}).then(response => response.json())
-  .then(data => console.log(data));
-```
+3. **Investment Dashboard Portfolio Check**
+   - **Request**: GET `/api/banking/balance`
+   - **Expected Outcome**: Successfully fetches balance with status "success" and message "Balance: ₹10,000".
 
-## Common Issues and Solutions
-
-1. **Preflight Failures**
-   - Check allowed methods and headers
-   - Verify origin is in allowed list
-   - Ensure credentials are properly configured
-
-2. **Credential Issues**
-   - Set `allowCredentials` to true in CORS config
-   - Include `credentials: 'include'` in fetch calls
-   - Configure cookie settings properly
-
-3. **Header Problems**
-   - Verify `Access-Control-Allow-Headers`
-   - Check case sensitivity
-   - Include all required custom headers
+4. **Unauthorized Origin Access**
+   - **Request**: Any request from an unauthorized origin
+   - **Expected Outcome**: Request is blocked with "Invalid CORS request" message.
 
 ## Best Practices
 
-1. **Security**
-   - Limit allowed origins to known domains
-   - Restrict HTTP methods to required ones
-   - Minimize exposed headers
-   - Use HTTPS in production
+### Security
+- ✅ Use HTTPS for all banking endpoints
+- ✅ Specify exact origins for each banking application
+- ✅ Implement token-based authentication
+- ❌ Never use wildcards for sensitive operations
 
-2. **Performance**
-   - Set appropriate max age for preflight
-   - Cache CORS responses
-   - Monitor preflight requests
+### Performance
+- Set appropriate preflight cache duration
+- Monitor CORS errors in production
+- Cache CORS responses when possible
 
-3. **Maintenance**
-   - Document CORS configuration
-   - Log CORS errors
-   - Review allowed origins regularly
+### Maintenance
+- Document all CORS configurations
+- Regularly review allowed origins
+- Keep security policies updated
 
 ## Additional Resources
 - [Spring CORS Documentation](https://docs.spring.io/spring-framework/docs/current/reference/html/web.html#mvc-cors)
@@ -297,166 +425,4 @@ Need help? Check out:
 - Stack Overflow with tag [spring-cors]
 - Spring Security Forum
 
-Remember: CORS is a critical security feature. Always test thoroughly and follow security best practices.
-
-## CORS Request Flow
-
-```mermaid
-sequenceDiagram
-    participant C as Client
-    participant B as Browser
-    participant S as Server
-    
-    Note over C,S: Simple Request
-    C->>B: Initiate API call
-    B->>S: Request with Origin header
-    S->>S: Check CORS policy
-    S->>B: Response with CORS headers
-    B->>C: Return response if allowed
-    
-    Note over C,S: Preflight Request
-    C->>B: Initiate complex API call
-    B->>S: OPTIONS request
-    S->>S: Check CORS policy
-    S->>B: Response with CORS headers
-    B->>S: Actual request if allowed
-    S->>B: Response with CORS headers
-    B->>C: Return response
-```
-
-## CORS Headers Flow
-
-```mermaid
-graph LR
-    subgraph "Request Headers"
-        OH[Origin]
-        MH[Method]
-        CH[Custom Headers]
-    end
-
-    subgraph "CORS Filter"
-        CP[CORS Policy]
-        VC[Validate Configuration]
-    end
-
-    subgraph "Response Headers"
-        AO[Access-Control-Allow-Origin]
-        AM[Access-Control-Allow-Methods]
-        AH[Access-Control-Allow-Headers]
-        AC[Access-Control-Allow-Credentials]
-    end
-
-    OH -->|Check| CP
-    MH -->|Verify| CP
-    CH -->|Validate| CP
-    CP -->|Generate| AO
-    CP -->|Generate| AM
-    CP -->|Generate| AH
-    CP -->|Generate| AC
-
-    style OH fill:#f9f,stroke:#333
-    style CP fill:#bbf,stroke:#333
-    style AO fill:#bfb,stroke:#333
-```
-
-## Features
-
-1. **Flexible CORS Configuration**: 
-   - Configure allowed origins, methods, and headers
-   - Handle credentials and exposed headers
-   - Set max age for preflight responses
-
-2. **Security Best Practices**:
-   - Origin validation
-   - Method restrictions
-   - Header controls
-   - Credential handling
-
-3. **Demo Endpoints**:
-   - GET /api/data
-   - POST /api/submit
-   - Automatic OPTIONS handling
-
-## Implementation Details
-
-### 1. CORS Configuration
-```java
-@Bean
-public CorsConfigurationSource corsConfigurationSource() {
-    CorsConfiguration configuration = new CorsConfiguration();
-    configuration.setAllowedOrigins(Arrays.asList("http://localhost:3000"));
-    configuration.setAllowedMethods(Arrays.asList("GET", "POST"));
-    // ... more configuration
-    return new UrlBasedCorsConfigurationSource();
-}
-```
-
-### 2. Security Integration
-```java
-@Bean
-public SecurityFilterChain filterChain(HttpSecurity http) {
-    http.cors().and()
-        // ... more configuration
-    return http.build();
-}
-```
-
-## Testing CORS
-
-1. **Simple Requests**:
-```javascript
-fetch('http://localhost:8080/api/data', {
-    method: 'GET',
-    credentials: 'include'
-})
-```
-
-2. **Preflight Requests**:
-```javascript
-fetch('http://localhost:8080/api/submit', {
-    method: 'POST',
-    headers: {
-        'Content-Type': 'application/json',
-        'Custom-Header': 'value'
-    },
-    body: JSON.stringify({ data: 'test' })
-})
-```
-
-## Common CORS Issues and Solutions
-
-1. **Missing Allow-Origin Header**
-   - Ensure correct origin configuration
-   - Use allowedOrigins or allowedOriginPatterns
-
-2. **Credentials Issues**
-   - Set allowCredentials to true
-   - Specify exact origin (no wildcards)
-   - Include credentials in fetch calls
-
-3. **Method Not Allowed**
-   - Configure allowedMethods correctly
-   - Handle OPTIONS requests properly
-
-## Best Practices
-
-1. **Security**:
-   - Never use `allowedOrigins("*")` with credentials
-   - Explicitly list allowed origins
-   - Minimize exposed headers
-
-2. **Performance**:
-   - Set appropriate maxAge
-   - Use pattern matching for similar origins
-   - Cache CORS responses
-
-3. **Maintenance**:
-   - Document all CORS configurations
-   - Monitor CORS errors
-   - Regular security audits
-
-## Additional Resources
-
-- [Spring CORS Documentation](https://docs.spring.io/spring-framework/reference/web/webmvc-cors.html)
-- [MDN CORS Guide](https://developer.mozilla.org/en-US/docs/Web/HTTP/CORS)
-- [OWASP CORS Guide](https://owasp.org/www-project-web-security-testing-guide/latest/4-Web_Application_Security_Testing/11-Client_Side_Testing/07-Testing_Cross_Origin_Resource_Sharing)
+Remember: CORS is a critical security feature for banking applications. Always test thoroughly and follow security best practices.

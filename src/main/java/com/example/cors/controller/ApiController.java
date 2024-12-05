@@ -1,6 +1,7 @@
 package com.example.cors.controller;
 
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.RequestMethod;
 import java.util.Map;
 import java.util.HashMap;
 
@@ -23,7 +24,7 @@ public class ApiController {
         return response;
     }
 
-    @Options
+    @RequestMapping(method = RequestMethod.OPTIONS)
     public void handleOptions() {
         // This method handles OPTIONS requests
         // Spring will automatically add appropriate CORS headers

@@ -1,0 +1,10 @@
+{
+  "name": "cors-protection-demo",
+  "version": "1.0.0",
+  "description": "CORS Protection Demo with Banking Apps",
+  "scripts": {
+    "start-mobile": "npx http-server src/main/resources/static/mobile -p 3000 --cors",
+    "start-planner": "npx http-server src/main/resources/static/planner -p 3001 --cors",
+    "start-invest": "npx http-server src/main/resources/static/invest -p 3002 --cors"
+  }
+}
