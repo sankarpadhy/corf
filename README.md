@@ -8,7 +8,6 @@
 5. [Testing and Validation](#testing-and-validation)
 6. [Best Practices](#best-practices)
 7. [Additional Resources](#additional-resources)
-8. [Setup and Running Instructions](#setup-and-running-instructions)
 
 ## Understanding CORS
 
@@ -179,9 +178,10 @@ This flow demonstrates:
 4. **Security Checks**: Different validation steps for cross-origin requests
 
 ## Implementation Guide
-
+Client Request → CORS Filter → Origin Check → Config Source → Add Headers → API Response
 ### Backend Configuration
 
+#### 1. Spring Security Configuration
 ```java
 @Configuration
 @EnableWebSecurity
@@ -202,276 +202,325 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-        configuration.setAllowedOrigins(Arrays.asList(
-            "http://localhost:3000",
-            "http://localhost:3001",
-            "http://localhost:3002"
-        ));
-        configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS"));
-        configuration.setAllowedHeaders(Arrays.asList("Authorization", "Content-Type", "X-Requested-With"));
-        configuration.setAllowCredentials(true);
         
+        // Allow specific origins
+        configuration.setAllowedOrigins(Arrays.asList(
+            "http://localhost:8080",  // Main banking portal
+            "http://localhost:3000",  // Mobile banking
+            "http://localhost:3001",  // Financial planner
+            "http://localhost:3002"   // Investment dashboard
+        ));
+        
+        configuration.setAllowedMethods(Arrays.asList(
+            "GET", "POST", "PUT", "DELETE", "OPTIONS"
+        ));
+        
+        configuration.setAllowedHeaders(Arrays.asList(
+            "Authorization",
+            "Content-Type",
+            "X-Requested-With"
+        ));
+        
+        configuration.setAllowCredentials(true);
+        configuration.setMaxAge(3600L); // 1 hour
+
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
-        source.registerCorsConfiguration("/**", configuration);
+        source.registerCorsConfiguration("/api/**", configuration);
         return source;
     }
 }
 ```
 
-### API Implementation
-
+#### 2. API Controller Example
 ```java
 @RestController
 @RequestMapping("/api/banking")
 public class BankingController {
-    /**
-     * Get Account Balance
-     * 
-     * Same-Origin Flow:
-     * mybank.com ───▶ api.mybank.com/balance
-     *   (No CORS check needed)
-     * 
-     * Cross-Origin Flow:
-     * partner.com ──[CORS]──▶ api.mybank.com/balance
-     */
     @GetMapping("/balance")
     public ResponseEntity<?> getBalance() {
-        // Simulate balance check
         return ResponseEntity.ok(new ApiResponse("success", "Balance: ₹10,000"));
     }
     
-    /**
-     * Transfer Funds
-     * 
-     * Preflight Flow:
-     * 1. OPTIONS request
-     *    partner.com ──[CORS]──▶ api.mybank.com/transfer
-     * 2. Actual POST
-     *    partner.com ──[CORS]──▶ api.mybank.com/transfer
-     */
     @PostMapping("/transfer")
-    public ResponseEntity<?> makeTransfer(@RequestBody TransferRequest request) {
-        // Simulate transfer
-        return ResponseEntity.ok(new ApiResponse("success", 
-            String.format("Transferred ₹%d to account", request.getAmount())));
-    }
-
-    /**
-     * Handle OPTIONS requests explicitly
-     * Required for CORS preflight requests
-     */
-    @RequestMapping(method = RequestMethod.OPTIONS)
-    public ResponseEntity<?> handleOptions() {
-        return ResponseEntity.ok().build();
+    public ResponseEntity<?> transfer(@RequestBody TransferRequest request) {
+        // Process transfer
+        return ResponseEntity.ok(new ApiResponse("success", "Transfer completed"));
     }
 }
 ```
 
 ### Frontend Implementation
 
+#### 1. HTML Structure (Financial Planner Example)
 ```html
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MyBank Mobile App</title>
+    <title>MyBank Financial Planner</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
-    <style>
-        .bank-card {
-            background: linear-gradient(45deg, #2193b0, #6dd5ed);
-            color: white;
-            border-radius: 15px;
-            padding: 20px;
-            margin: 20px 0;
-        }
-        .balance-amount {
-            font-size: 2em;
-            font-weight: bold;
-        }
-    </style>
 </head>
 <body>
     <div class="container mt-5">
-        <div class="row">
-            <div class="col-md-8 offset-md-2">
-                <h1 class="mb-4">MyBank Mobile Banking</h1>
-                <div class="bank-card">
-                    <h3>Account Balance</h3>
-                    <div id="balanceDisplay" class="balance-amount">Loading...</div>
-                    <button onclick="checkBalance()" class="btn btn-light mt-3">Refresh Balance</button>
+        <h1>Financial Planning Dashboard</h1>
+        <div class="card mt-4">
+            <div class="card-body">
+                <h3>Plan Investment</h3>
+                <div class="mb-3">
+                    <label for="amount">Investment Amount (₹)</label>
+                    <input type="number" class="form-control" id="amount">
                 </div>
-                
-                <div class="card mt-4">
-                    <div class="card-body">
-                        <h3>Transfer Money</h3>
-                        <div class="mb-3">
-                            <label for="amount" class="form-label">Amount (₹)</label>
-                            <input type="number" class="form-control" id="amount">
-                        </div>
-                        <div class="mb-3">
-                            <label for="toAccount" class="form-label">To Account</label>
-                            <input type="text" class="form-control" id="toAccount">
-                        </div>
-                        <button onclick="transfer()" class="btn btn-primary">Transfer</button>
-                    </div>
-                </div>
-                
-                <div id="message" class="alert mt-3" style="display: none;"></div>
+                <button onclick="transfer()" class="btn btn-success">Invest Now</button>
             </div>
         </div>
     </div>
-
-    <script>
-        const API_BASE = 'http://localhost:8080/api/banking';
-
-        async function checkBalance() {
-            try {
-                const response = await fetch(`${API_BASE}/balance`, {
-                    credentials: 'include'
-                });
-                const data = await response.json();
-                document.getElementById('balanceDisplay').textContent = data.message;
-                showMessage('success', 'Balance updated successfully');
-            } catch (error) {
-                showMessage('error', 'Failed to fetch balance: ' + error.message);
-            }
-        }
-
-        async function transfer() {
-            const amount = document.getElementById('amount').value;
-            const toAccount = document.getElementById('toAccount').value;
-
-            try {
-                const response = await fetch(`${API_BASE}/transfer`, {
-                    method: 'POST',
-                    credentials: 'include',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({ amount, toAccount })
-                });
-                const data = await response.json();
-                showMessage('success', data.message);
-            } catch (error) {
-                showMessage('error', 'Transfer failed: ' + error.message);
-            }
-        }
-
-        function showMessage(type, text) {
-            const msgDiv = document.getElementById('message');
-            msgDiv.className = `alert alert-${type === 'success' ? 'success' : 'danger'} mt-3`;
-            msgDiv.textContent = text;
-            msgDiv.style.display = 'block';
-            setTimeout(() => msgDiv.style.display = 'none', 5000);
-        }
-
-        // Initial balance check
-        checkBalance();
-    </script>
 </body>
 </html>
 ```
 
-## Testing and Validation
+#### 2. JavaScript Implementation
+```javascript
+async function transfer() {
+    try {
+        const response = await fetch('http://localhost:8080/api/banking/transfer', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                amount: document.getElementById('amount').value,
+                toAccount: 'investment-account'
+            })
+        });
+        
+        const data = await response.json();
+        showMessage('success', 'Investment successful!');
+    } catch (error) {
+        showMessage('error', 'Failed to process investment');
+        console.error('Error:', error);
+    }
+}
+```
 
-### Manual Test Cases
+### Request Flow Examples
 
-1. **Mobile Banking App Balance Check**
-   - **Request**: GET `/api/banking/balance`
-   - **Expected Outcome**: Successfully fetches balance with status "success" and message "Balance: ₹10,000".
+#### 1. Simple Request (No Preflight)
+```mermaid
+sequenceDiagram
+    participant Client as Financial Planner
+    participant Browser
+    participant Server as Banking API
+    
+    Client->>Browser: GET Balance Request
+    Browser->>Server: GET /api/banking/balance
+    Note over Browser,Server: Headers:<br/>Origin: http://localhost:3001
+    Server->>Browser: 200 OK
+    Note over Server,Browser: Headers:<br/>Access-Control-Allow-Origin: http://localhost:3001
+    Browser->>Client: Display Balance
+```
 
-2. **Financial Planner Transfer**
-   - **Preflight Request**:
-     - **Request**: OPTIONS `/api/banking/transfer`
-     - **Expected Outcome**: Successful preflight with appropriate CORS headers.
-   - **Actual Transfer Request**:
-     - **Request**: POST `/api/banking/transfer`
-     - **Expected Outcome**: Successfully transfers funds with status "success" and message "Transferred ₹5000 to account".
+#### 2. Complex Request (With Preflight)
+```mermaid
+sequenceDiagram
+    participant Client as Financial Planner
+    participant Browser
+    participant Server as Banking API
+    
+    Client->>Browser: POST Transfer Request
+    
+    Note over Browser,Server: Step 1: Preflight
+    Browser->>Server: OPTIONS /api/banking/transfer
+    Note over Browser,Server: Headers:<br/>Origin: http://localhost:3001<br/>Access-Control-Request-Method: POST<br/>Access-Control-Request-Headers: Content-Type
+    Server->>Browser: 200 OK
+    Note over Server,Browser: Headers:<br/>Access-Control-Allow-Origin: http://localhost:3001<br/>Access-Control-Allow-Methods: POST<br/>Access-Control-Allow-Headers: Content-Type
+    
+    Note over Browser,Server: Step 2: Actual Request
+    Browser->>Server: POST /api/banking/transfer
+    Note over Browser,Server: Headers:<br/>Origin: http://localhost:3001<br/>Content-Type: application/json
+    Server->>Browser: 200 OK
+    Note over Server,Browser: Headers:<br/>Access-Control-Allow-Origin: http://localhost:3001
+    
+    Browser->>Client: Show Success Message
+```
 
-3. **Investment Dashboard Portfolio Check**
-   - **Request**: GET `/api/banking/balance`
-   - **Expected Outcome**: Successfully fetches balance with status "success" and message "Balance: ₹10,000".
+### Testing Guide
 
-4. **Unauthorized Origin Access**
-   - **Request**: Any request from an unauthorized origin
-   - **Expected Outcome**: Request is blocked with "Invalid CORS request" message.
+#### 1. Manual Browser Testing
 
-## Best Practices
+##### Method 1: Using Python HTTP Servers
+1. Start the applications:
+   ```bash
+   # Terminal 1: Start Spring Boot backend
+   mvn spring-boot:run
+   
+   # Terminal 2: Start frontend servers using Python
+   start-apps.bat
+   ```
+   This method uses Python's built-in HTTP server to serve static files:
+   - Starts servers on ports 3000, 3001, and 3002
+   - Simple and lightweight
+   - No Node.js dependencies required
 
-### Security
-- ✅ Use HTTPS for all banking endpoints
-- ✅ Specify exact origins for each banking application
-- ✅ Implement token-based authentication
-- ❌ Never use wildcards for sensitive operations
+##### Method 2: Using Node.js Development Servers
+1. Start the applications:
+   ```bash
+   # Terminal 1: Start Spring Boot backend
+   mvn spring-boot:run
+   
+   # Terminal 2: Start frontend servers using npm
+   start-frontend.bat
+   ```
+   This method uses Node.js development servers:
+   - Provides hot-reloading
+   - Better for development
+   - Requires Node.js and npm installed
 
-### Performance
-- Set appropriate preflight cache duration
-- Monitor CORS errors in production
-- Cache CORS responses when possible
+The `start-frontend.bat` script contains:
+```batch
+@echo off
+cd /d %~dp0
 
-### Maintenance
-- Document all CORS configurations
-- Regularly review allowed origins
-- Keep security policies updated
+REM Start Mobile Banking App
+echo Starting Mobile Banking App...
+start /b npm run start-mobile
+
+REM Start Financial Planner App
+echo Starting Financial Planner App...
+start /b npm run start-planner
+
+REM Start Investment Dashboard App
+echo Starting Investment Dashboard App...
+start /b npm run start-invest
+
+REM Wait for user input to close
+echo.
+echo Press any key to stop the servers...
+pause >nul
+```
+
+2. Access applications:
+   - Main Portal: http://localhost:8080
+   - Mobile Banking: http://localhost:3000
+   - Financial Planner: http://localhost:3001
+   - Investment Dashboard: http://localhost:3002
+
+3. Monitor CORS in Browser DevTools (F12):
+   - Network tab → Enable "All"
+   - Look for:
+     - OPTIONS requests (preflight)
+     - CORS headers in responses
+     - Any CORS errors in console
+
+#### 2. Curl Testing Examples
+```bash
+# Test 1: Simple GET Request
+curl -H "Origin: http://localhost:3001" \
+     -v http://localhost:8080/api/banking/balance
+
+# Test 2: Preflight + POST Request
+# First, the OPTIONS request
+curl -X OPTIONS \
+     -H "Origin: http://localhost:3001" \
+     -H "Access-Control-Request-Method: POST" \
+     -H "Access-Control-Request-Headers: Content-Type" \
+     -v http://localhost:8080/api/banking/transfer
+
+# Then, the actual POST
+curl -X POST \
+     -H "Origin: http://localhost:3001" \
+     -H "Content-Type: application/json" \
+     -d '{"amount": 1000, "toAccount": "investment"}' \
+     -v http://localhost:8080/api/banking/transfer
+```
+
+#### 3. Expected CORS Headers
+
+##### Preflight Response Headers
+```http
+Access-Control-Allow-Origin: http://localhost:3001
+Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS
+Access-Control-Allow-Headers: Authorization, Content-Type, X-Requested-With
+Access-Control-Allow-Credentials: true
+Access-Control-Max-Age: 3600
+```
+
+##### Actual Response Headers
+```http
+Access-Control-Allow-Origin: http://localhost:3001
+Vary: Origin
+Content-Type: application/json
+```
+
+### Common CORS Errors and Solutions
+
+#### 1. Invalid Origin
+```javascript
+// Error in Console
+Access to fetch at 'http://localhost:8080/api/banking/balance' from origin 
+'http://unauthorized-origin.com' has been blocked by CORS policy
+```
+**Solution**: Add origin to `allowedOrigins` in `corsConfigurationSource()`
+
+#### 2. Missing Required Headers
+```javascript
+// Error in Console
+Request header field X-Custom-Header is not allowed by 
+Access-Control-Allow-Headers in preflight response
+```
+**Solution**: Add header to `allowedHeaders` in `corsConfigurationSource()`
+
+#### 3. Method Not Allowed
+```javascript
+// Error in Console
+Method PUT is not allowed by Access-Control-Allow-Methods in preflight response
+```
+**Solution**: Add method to `allowedMethods` in `corsConfigurationSource()`
+
+### Security Best Practices
+
+1. **Origin Specification**
+   ```java
+   // ❌ Don't use wildcard for sensitive data
+   configuration.setAllowedOrigins(Arrays.asList("*"));
+   
+   // ✅ Specify exact origins
+   configuration.setAllowedOrigins(Arrays.asList(
+       "http://localhost:3000",
+       "https://production-app.com"
+   ));
+   ```
+
+2. **Credentials Handling**
+   ```java
+   // ❌ Don't use credentials with wildcard
+   configuration.setAllowCredentials(true);
+   configuration.setAllowedOrigins(Arrays.asList("*"));
+   
+   // ✅ Use credentials with specific origins
+   configuration.setAllowCredentials(true);
+   configuration.setAllowedOrigins(Arrays.asList("http://localhost:3000"));
+   ```
+
+3. **Header Restrictions**
+   ```java
+   // ❌ Don't allow all headers
+   configuration.setAllowedHeaders(Arrays.asList("*"));
+   
+   // ✅ Specify required headers only
+   configuration.setAllowedHeaders(Arrays.asList(
+       "Authorization",
+       "Content-Type"
+   ));
+   ```
+
+## Setup and Running Instructions
+
+For detailed instructions on running the applications, refer to the [Testing Guide](#1-manual-browser-testing) section.
 
 ## Additional Resources
 - [Spring CORS Documentation](https://docs.spring.io/spring-framework/docs/current/reference/html/web.html#mvc-cors)
 - [MDN CORS Guide](https://developer.mozilla.org/en-US/docs/Web/HTTP/CORS)
 - [OWASP CORS Guidelines](https://owasp.org/www-project-web-security-testing-guide/latest/4-Web_Application_Security_Testing/11-Client_Side_Testing/07-Testing_Cross_Origin_Resource_Sharing)
-
-## Setup and Running Instructions
-
-### Prerequisites
-
-- Java 17
-- Maven
-- Node.js (for running frontend servers)
-- Git
-
-### Quick Start
-
-1. **Clone the Repository**
-   ```bash
-   git clone https://github.com/sankarpadhy/cors-protection.git
-   cd cors-protection
-   ```
-
-2. **Start the Backend Server**
-   ```bash
-   # Using Maven
-   mvn spring-boot:run
-
-   # The backend will start on http://localhost:8080
-   ```
-
-3. **Start the Frontend Applications**
-   ```bash
-   # On Windows, use the batch file
-   start-frontend.bat
-
-   # Or start manually using npm
-   npm run start:mobile    # Starts Mobile Banking on http://localhost:3000
-   npm run start:planner   # Starts Financial Planner on http://localhost:3001
-   npm run start:invest    # Starts Investment Dashboard on http://localhost:3002
-   ```
-
-### Accessing the Applications
-
-After starting the servers, you can access the applications at:
-
-- Mobile Banking App: [http://localhost:3000](http://localhost:3000)
-- Financial Planner: [http://localhost:3001](http://localhost:3001)
-- Investment Dashboard: [http://localhost:3002](http://localhost:3002)
-
-### Running Tests
-
-To test the CORS functionality:
-
-```bash
-# Run the test script
-sh test-cors.sh
-```
 
 ## Support
 Need help? Check out:
